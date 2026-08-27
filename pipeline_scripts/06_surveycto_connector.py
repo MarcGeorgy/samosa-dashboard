@@ -4,7 +4,7 @@ SurveyCTO REST API connector.
 Before this can pull real data:
   1. In your SurveyCTO console (https://<server>.surveycto.com/console),
      upload and deploy 01_msy_listing_survey.xlsx as a NEW, clearly-labeled
-     TEST form - e.g. title "MSY Listing Survey - TEST" and form ID
+     TEST form - e.g. title "S.A.M.O.S.A Listing Survey - TEST" and form ID
      "msy_listing_survey_test" - so it can never be confused with a real
      production deployment. The form ID you choose becomes SCTO_FORM_ID below.
   2. Create/use a SurveyCTO login with API access (Console > Users) for

@@ -1,5 +1,5 @@
 """
-Interactive AI assistant for the enumerator debrief call.
+Interactive assistant for the enumerator debrief call.
 
 Run with:
     streamlit run pipeline_scripts/11_debrief_app.py
@@ -9,12 +9,12 @@ Requires output/msy_listing_raw_export.csv to already exist (run
 10_simulate_new_submission.py to feed it live).
 
 Tabs:
+  - Debrief Agenda       full call agenda generated from the data below
   - Overview            headline QA numbers for the current dataset
   - Correct Outliers     today's flagged records, editable in place -
                           "corrected on the spot" during the call
-  - Comment Themes       LLM-summarized enumerator free-text comments
+  - Comment Themes       auto-summarized enumerator free-text comments
   - Enumerator Callouts  who to flag for a check-in vs. commend, and why
-  - Debrief Agenda       full call agenda generated from the above
 
 Corrections write straight to output/msy_listing_raw_export.csv (matched by
 KEY) and are logged to output/corrections_log.csv for audit, then the
@@ -49,7 +49,7 @@ def _import(module_name: str, filename: str):
 
 
 pipeline = _import("monitoring_pipeline", "05_monitoring_pipeline.py")
-llm = _import("llm_comment_analysis", "07_llm_comment_analysis.py")
+comment_analysis = _import("comment_analysis", "07_comment_analysis.py")
 insights = _import("debrief_insights", "08_debrief_insights.py")
 scto = _import("surveycto_connector", "06_surveycto_connector.py")
 excel_export = _import("excel_export", "12_excel_export.py")
@@ -59,7 +59,36 @@ DT_FMT = "%b %d, %Y %I:%M:%S %p"
 LIVE_MODE = bool(os.environ.get("SCTO_SERVER") and os.environ.get("SCTO_USERNAME")
                   and os.environ.get("SCTO_PASSWORD"))
 
-st.set_page_config(page_title="MSY Debrief Assistant", layout="wide")
+# J-PAL brand colors (Abdul Latif Jameel Poverty Action Lab visual identity)
+JPAL_ORANGE = "#E35925"
+JPAL_TEAL = "#2FAA9F"
+JPAL_GREEN = "#61B77F"
+JPAL_YELLOW = "#F2C200"
+JPAL_BLUE = "#2D616E"
+
+st.set_page_config(page_title="S.A.M.O.S.A Debrief Assistant", page_icon="💧", layout="wide")
+
+st.markdown(f"""
+<link href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+html, body, [class*="css"] {{ font-family: 'Open Sans', sans-serif; }}
+.jpal-header {{ display: flex; align-items: center; gap: 14px; padding-bottom: 6px;
+                border-bottom: 3px solid {JPAL_ORANGE}; margin-bottom: 18px; }}
+.jpal-header .jpal-word {{ font-family: 'Open Sans', sans-serif; font-weight: 700;
+                           font-size: 30px; color: {JPAL_BLUE}; letter-spacing: 0.5px; }}
+.jpal-header .jpal-sub {{ font-family: 'Open Sans', sans-serif; font-weight: 400;
+                          font-size: 15px; color: {JPAL_TEAL}; margin-top: 2px; }}
+</style>
+<div class="jpal-header">
+  <svg width="34" height="34" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+    <path d="M50 6 C25 40 12 62 12 78 A38 38 0 1 0 88 78 C88 62 75 40 50 6 Z" fill="{JPAL_ORANGE}"/>
+  </svg>
+  <div>
+    <div class="jpal-word">J-PAL</div>
+    <div class="jpal-sub">S.A.M.O.S.A Debrief Assistant</div>
+  </div>
+</div>
+""", unsafe_allow_html=True)
 
 
 # --------------------------------------------------------------- data load
@@ -85,7 +114,7 @@ def load_comments_feed():
 
 def build_narrative(summary_json: dict, enum_summary: pd.DataFrame) -> str:
     """Plain-language paragraph summarizing the current dataset - always
-    available (templated, not LLM-dependent) so the Overview tab reads as a
+    available (templated, no API call needed) so the Overview tab reads as a
     briefing rather than a bare metrics dump."""
     s = summary_json
     band = s.get("quality_band_counts", {})
@@ -173,8 +202,7 @@ summary_json = load_summary_json()
 daily = load_daily()
 
 # --------------------------------------------------------------- sidebar
-st.sidebar.title("MSY Debrief Assistant")
-st.sidebar.caption(f"LLM mode: {'🟢 LIVE (Claude API)' if llm.USE_LIVE_LLM else '🟡 STUB (set ANTHROPIC_API_KEY for live analysis)'}")
+st.sidebar.caption(f"Analysis mode: {'🟢 Live (Claude)' if comment_analysis.ANALYSIS_LIVE else '🟡 Offline (set ANTHROPIC_API_KEY for live analysis)'}")
 st.sidebar.caption(f"Data source: {'🟢 LIVE SurveyCTO (' + scto.SERVER_NAME + ')' if LIVE_MODE else '🟡 Local simulation - set SCTO_SERVER/SCTO_USERNAME/SCTO_PASSWORD for live data'}")
 
 if st.sidebar.button("🔄 Refresh from latest data", width="stretch",
@@ -197,13 +225,13 @@ comments_feed = load_comments_feed()
 xlsx_bytes = excel_export.build_workbook(flagged, enum_summary, daily, comments_feed, summary_json)
 st.sidebar.download_button(
     "📥 Export dashboard to Excel", xlsx_bytes,
-    file_name=f"msy_dashboard_{datetime.now().strftime('%Y%m%d_%H%M')}.xlsx",
+    file_name=f"samosa_dashboard_{datetime.now().strftime('%Y%m%d_%H%M')}.xlsx",
     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
     width="stretch",
 )
 
-tab_overview, tab_correct, tab_comments, tab_enum, tab_agenda = st.tabs(
-    ["Overview", "Correct Outliers", "Comment Themes", "Enumerator Callouts", "Debrief Agenda"]
+tab_agenda, tab_overview, tab_correct, tab_comments, tab_enum = st.tabs(
+    ["Debrief Agenda", "Overview", "Correct Outliers", "Comment Themes", "Enumerator Callouts"]
 )
 
 # --------------------------------------------------------------- overview
@@ -350,8 +378,8 @@ with tab_correct:
 with tab_comments:
     st.header("Field comment analysis")
     with st.spinner("Analyzing comments..."):
-        enriched = llm.analyze_comments_batch(flagged)
-        themes = llm.summarize_comment_themes(enriched)
+        enriched = comment_analysis.analyze_comments_batch(flagged)
+        themes = comment_analysis.summarize_comment_themes(enriched)
 
     st.info(themes.get("overall_summary", ""))
     for t in themes.get("themes", []):
@@ -360,14 +388,14 @@ with tab_comments:
                         f"affecting: {', '.join(t['affected_enumerators'])}")
             st.caption(f"“{t['example_quote']}”")
 
-    st.subheader("All comments (LLM-enriched)")
+    st.subheader("All comments (analyzed)")
     with_comments = enriched[enriched["enumerator_comments"] != ""]
     st.dataframe(with_comments[[
         "enumerator_id", "hh_id", "enumerator_comments", "comment_tag",
-        "llm_tags", "llm_severity", "llm_keyword_false_positive", "llm_recommended_action"
+        "detail_tags", "detail_severity", "keyword_mismatch", "recommended_action"
     ]], width="stretch")
-    st.caption("`comment_tag` is the pipeline's single-keyword tag; `llm_tags`/`llm_severity` are the "
-               "richer LLM read, and `llm_keyword_false_positive` flags comments where the keyword tag "
+    st.caption("`comment_tag` is the pipeline's single-keyword tag; `detail_tags`/`detail_severity` are the "
+               "richer analyzed read, and `keyword_mismatch` flags comments where the keyword tag "
                "likely got it wrong (e.g. negated fatigue language).")
 
 # --------------------------------------------------------- enumerator callouts

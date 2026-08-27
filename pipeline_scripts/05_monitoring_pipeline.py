@@ -1,5 +1,5 @@
 """
-Real-time data quality monitoring pipeline for the MSY listing survey.
+Real-time data quality monitoring pipeline for the S.A.M.O.S.A listing survey.
 
 Designed to run repeatedly (cron / SurveyCTO webhook / manual re-run) against
 whatever the latest SurveyCTO export looks like. Each run is idempotent: it

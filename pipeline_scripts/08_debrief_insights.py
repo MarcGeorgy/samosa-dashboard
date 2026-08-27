@@ -6,13 +6,13 @@ Data-driven inputs for the enumerator debrief call:
                                     05_monitoring_pipeline.py already produces
   - todays_flagged_records()       today's outliers/duplicates/fatigue flags,
                                     the set a supervisor can correct live
-  - generate_debrief_agenda()      pulls both of the above plus the LLM
+  - generate_debrief_agenda()      pulls both of the above plus the
                                     comment-theme summary (07) into one
                                     agenda, phrased by Claude (or a stub)
 
 All the *selection* logic (who gets flagged, which records need correction)
 is plain pandas over the pipeline's own output - deterministic and
-inspectable. The LLM (see 07_llm_comment_analysis.py for the stub/live
+inspectable. Claude (see 07_comment_analysis.py for the stub/live
 split) is only used to turn that structured selection into call-ready prose;
 swapping stub<->live never changes who gets flagged.
 """
@@ -40,7 +40,7 @@ def _import(module_name: str, filename: str):
     return module
 
 
-llm = _import("llm_comment_analysis", "07_llm_comment_analysis.py")
+comment_analysis = _import("comment_analysis", "07_comment_analysis.py")
 
 FATIGUE_PCT_FLAG_THRESHOLD = 10.0   # % of an enumerator's interviews fatigue-flagged
 Z_SCORE_FLAG = -1.0                 # avg_quality_score this far below the group mean
@@ -110,7 +110,7 @@ def todays_flagged_records(flagged: pd.DataFrame, work_date=None) -> pd.DataFram
 def _agenda_payload(flagged, enum_summary, summary_json, work_date=None) -> dict:
     recs = enumerator_recommendations(enum_summary)
     correctable = todays_flagged_records(flagged, work_date)
-    themes = llm.summarize_comment_themes(flagged)
+    themes = comment_analysis.summarize_comment_themes(flagged)
 
     resolved_date = work_date or (correctable["_work_date"].iloc[0] if len(correctable) else "latest available day")
     return {
@@ -175,7 +175,7 @@ def _stub_phrase_agenda(payload: dict) -> str:
 
 
 def _live_phrase_agenda(payload: dict) -> str:
-    client = llm._client()
+    client = comment_analysis._client()
     response = client.messages.create(
         model=MODEL,
         max_tokens=2048,
@@ -195,7 +195,7 @@ def _live_phrase_agenda(payload: dict) -> str:
 def generate_debrief_agenda(flagged: pd.DataFrame, enum_summary: pd.DataFrame,
                              summary_json: dict, work_date=None) -> str:
     payload = _agenda_payload(flagged, enum_summary, summary_json, work_date)
-    if llm.USE_LIVE_LLM:
+    if comment_analysis.ANALYSIS_LIVE:
         return _live_phrase_agenda(payload)
     return _stub_phrase_agenda(payload)
 
@@ -207,5 +207,5 @@ if __name__ == "__main__":
     enum_summary = pd.read_csv(OUT_DIR / "enumerator_summary.csv")
     summary_json = json.loads((OUT_DIR / "monitoring_summary.json").read_text())
 
-    print(f"mode: {'LIVE anthropic API' if llm.USE_LIVE_LLM else 'STUB (set ANTHROPIC_API_KEY for live analysis)'}")
+    print(f"mode: {'LIVE Claude API' if comment_analysis.ANALYSIS_LIVE else 'OFFLINE (set ANTHROPIC_API_KEY for live analysis)'}")
     print(generate_debrief_agenda(flagged, enum_summary, summary_json))

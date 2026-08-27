@@ -1,0 +1,7 @@
+[theme]
+# J-PAL (Abdul Latif Jameel Poverty Action Lab) visual identity
+primaryColor = "#E35925"
+backgroundColor = "#FFFFFF"
+secondaryBackgroundColor = "#F4EDE9"
+textColor = "#2D2D2D"
+font = "sans serif"

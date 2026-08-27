@@ -1,5 +1,5 @@
 """
-LLM-based triage for enumerator free-text comments.
+Claude-based triage for enumerator free-text comments.
 
 05_monitoring_pipeline.py's `triage_comment()` is a single keyword match -
 fast and fully deterministic, but it single-tags each comment and can't
@@ -32,9 +32,9 @@ import pandas as pd
 
 MODEL = "claude-opus-5"
 OUT_DIR = Path(tempfile.gettempdir()) / "mvsy_monitoring" / "output"
-CACHE_PATH = OUT_DIR / "llm_comment_cache.json"
+CACHE_PATH = OUT_DIR / "comment_analysis_cache.json"
 
-USE_LIVE_LLM = bool(os.environ.get("ANTHROPIC_API_KEY"))
+ANALYSIS_LIVE = bool(os.environ.get("ANTHROPIC_API_KEY"))
 
 TAGS = ["fatigue", "respondent_fatigue", "duplicate", "data_quality", "logistics", "positive", "other"]
 SEVERITIES = ["none", "low", "medium", "high"]
@@ -116,12 +116,12 @@ _KEYWORDS = {
 
 
 def _stub_analyze(text: str, context: dict) -> dict:
-    """Heuristic stand-in for the LLM call: same output shape, cruder logic.
+    """Heuristic stand-in for the Claude call: same output shape, cruder logic.
 
     Unlike the pipeline's single-tag `triage_comment()`, this collects every
     matching category and treats a keyword hit inside a negated clause
     ("not rushed", "didn't feel rushed") as a positive/false-positive signal
-    instead of the issue it names - the specific gap a real LLM read closes.
+    instead of the issue it names - the specific gap a real Claude read closes.
     """
     low = text.lower()
     hits = []
@@ -200,7 +200,7 @@ def _stub_summarize_themes(comments: list[dict]) -> dict:
     return {"themes": themes, "overall_summary": overall, "_source": "stub"}
 
 
-# -------------------------------------------------------------- live LLM
+# ---------------------------------------------------------------- live call
 def _live_analyze(text: str, context: dict) -> dict:
     client = _client()
     ctx_str = ", ".join(f"{k}={v}" for k, v in context.items() if v not in (None, ""))
@@ -218,7 +218,7 @@ def _live_analyze(text: str, context: dict) -> dict:
     )
     text_block = next(b.text for b in response.content if b.type == "text")
     result = json.loads(text_block)
-    result["_source"] = "llm"
+    result["_source"] = "claude"
     return result
 
 
@@ -239,7 +239,7 @@ def _live_summarize_themes(comments: list[dict]) -> dict:
     )
     text_block = next(b.text for b in response.content if b.type == "text")
     result = json.loads(text_block)
-    result["_source"] = "llm"
+    result["_source"] = "claude"
     return result
 
 
@@ -249,20 +249,20 @@ def analyze_comment(text: str, context: dict | None = None) -> dict:
     if not text:
         return {"tags": [], "severity": "none", "keyword_tag_is_false_positive": False,
                 "summary": "", "recommended_action": "none", "_source": "none"}
-    if USE_LIVE_LLM:
+    if ANALYSIS_LIVE:
         return _live_analyze(text, context)
     return _stub_analyze(text, context)
 
 
 def analyze_comments_batch(df: pd.DataFrame, key_col: str = "KEY") -> pd.DataFrame:
-    """Enrich `df` (must have 'enumerator_comments' + key_col) with LLM columns.
+    """Enrich `df` (must have 'enumerator_comments' + key_col) with analysis columns.
 
     Cached by key_col in CACHE_PATH so re-running the pipeline (e.g. from
     the real-time watcher) only pays for genuinely new comments.
     """
     cache = _load_cache()
     df = df.copy()
-    llm_tags, llm_severity, llm_fp, llm_summary, llm_action = [], [], [], [], []
+    detail_tags, detail_severity, keyword_mismatch, comment_summary, recommended_action = [], [], [], [], []
 
     for _, row in df.iterrows():
         text = row.get("enumerator_comments", "") or ""
@@ -281,24 +281,24 @@ def analyze_comments_batch(df: pd.DataFrame, key_col: str = "KEY") -> pd.DataFra
             result = analyze_comment(text, context)
             cache[key] = result
 
-        llm_tags.append(", ".join(result.get("tags", [])))
-        llm_severity.append(result.get("severity", "none"))
-        llm_fp.append(result.get("keyword_tag_is_false_positive", False))
-        llm_summary.append(result.get("summary", ""))
-        llm_action.append(result.get("recommended_action", "none"))
+        detail_tags.append(", ".join(result.get("tags", [])))
+        detail_severity.append(result.get("severity", "none"))
+        keyword_mismatch.append(result.get("keyword_tag_is_false_positive", False))
+        comment_summary.append(result.get("summary", ""))
+        recommended_action.append(result.get("recommended_action", "none"))
 
     _save_cache(cache)
-    df["llm_tags"] = llm_tags
-    df["llm_severity"] = llm_severity
-    df["llm_keyword_false_positive"] = llm_fp
-    df["llm_summary"] = llm_summary
-    df["llm_recommended_action"] = llm_action
+    df["detail_tags"] = detail_tags
+    df["detail_severity"] = detail_severity
+    df["keyword_mismatch"] = keyword_mismatch
+    df["comment_summary"] = comment_summary
+    df["recommended_action"] = recommended_action
     return df
 
 
 def summarize_comment_themes(df: pd.DataFrame, max_comments: int = 80) -> dict:
     """Thematic narrative over a batch of comments, for the debrief agenda."""
-    enriched = analyze_comments_batch(df) if "llm_tags" not in df.columns else df
+    enriched = analyze_comments_batch(df) if "detail_tags" not in df.columns else df
     with_comments = enriched[enriched["enumerator_comments"] != ""]
     if len(with_comments) == 0:
         return {"themes": [], "overall_summary": "No enumerator comments in this period.", "_source": "none"}
@@ -309,10 +309,10 @@ def summarize_comment_themes(df: pd.DataFrame, max_comments: int = 80) -> dict:
         comments.append({
             "enumerator_id": row["enumerator_id"],
             "enumerator_comments": row["enumerator_comments"],
-            "analysis": {"tags": [t.strip() for t in row["llm_tags"].split(",") if t.strip()]},
+            "analysis": {"tags": [t.strip() for t in row["detail_tags"].split(",") if t.strip()]},
         })
 
-    if USE_LIVE_LLM:
+    if ANALYSIS_LIVE:
         return _live_summarize_themes(comments)
     return _stub_summarize_themes(comments)
 
@@ -324,7 +324,7 @@ if __name__ == "__main__":
     else:
         df = pd.read_csv(IN_PATH, dtype=str, keep_default_na=False)
         enriched = analyze_comments_batch(df)
-        enriched.to_csv(OUT_DIR / "msy_listing_flagged_with_llm.csv", index=False)
+        enriched.to_csv(OUT_DIR / "msy_listing_flagged_analyzed.csv", index=False)
         themes = summarize_comment_themes(enriched)
-        print(f"mode: {'LIVE anthropic API' if USE_LIVE_LLM else 'STUB (set ANTHROPIC_API_KEY for live analysis)'}")
+        print(f"mode: {'LIVE Claude API' if ANALYSIS_LIVE else 'OFFLINE (set ANTHROPIC_API_KEY for live analysis)'}")
         print(json.dumps(themes, indent=2))

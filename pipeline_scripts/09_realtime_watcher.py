@@ -17,7 +17,7 @@ Two modes, chosen automatically:
 Either way, once new rows are in the CSV, `check_once()`:
   1. reruns the monitoring pipeline over the full current dataset (it's
      idempotent by design - see 05_monitoring_pipeline.py's docstring)
-  2. runs LLM comment triage on the (now-current) flagged data - cached by
+  2. runs comment triage on the (now-current) flagged data - cached by
      submission KEY, so only genuinely new comments cost an API call
   3. alerts on any of the NEW rows that landed in band C/D or came back
      flagged as a duplicate, appending to output/alerts_log.csv
@@ -52,7 +52,7 @@ def _import(module_name: str, filename: str):
 
 
 pipeline = _import("monitoring_pipeline", "05_monitoring_pipeline.py")
-llm = _import("llm_comment_analysis", "07_llm_comment_analysis.py")
+comment_analysis = _import("comment_analysis", "07_comment_analysis.py")
 scto = _import("surveycto_connector", "06_surveycto_connector.py")
 
 LIVE_MODE = bool(os.environ.get("SCTO_SERVER") and os.environ.get("SCTO_USERNAME")
@@ -96,7 +96,7 @@ def _append_alerts(rows: list[dict]):
 
 
 def check_once(verbose: bool = True) -> dict:
-    """Single poll: detect new rows, rerun pipeline + LLM triage, alert. Returns a status dict."""
+    """Single poll: detect new rows, rerun pipeline + comment triage, alert. Returns a status dict."""
     if LIVE_MODE:
         _sync_from_surveycto(verbose=verbose)
 
@@ -114,8 +114,8 @@ def check_once(verbose: bool = True) -> dict:
 
     df, enum_summary, daily, comments, summary = pipeline.run_pipeline()
     flagged = pd.read_csv(OUT_DIR / "msy_listing_flagged.csv", dtype=str, keep_default_na=False)
-    enriched = llm.analyze_comments_batch(flagged)
-    enriched.to_csv(OUT_DIR / "msy_listing_flagged_with_llm.csv", index=False)
+    enriched = comment_analysis.analyze_comments_batch(flagged)
+    enriched.to_csv(OUT_DIR / "msy_listing_flagged_analyzed.csv", index=False)
 
     new_keys = set(new_rows["KEY"])
     new_flagged = enriched[enriched["KEY"].isin(new_keys)]
@@ -160,7 +160,7 @@ def watch(interval_sec: int = 30, max_iterations: int | None = None):
     source = f"live SurveyCTO server '{scto.SERVER_NAME}' (form '{scto.FORM_ID}')" if LIVE_MODE \
         else f"local simulation ({RAW_EXPORT_PATH})"
     print(f"Watching {source} every {interval_sec}s "
-          f"(Ctrl+C to stop; LLM mode: {'LIVE' if llm.USE_LIVE_LLM else 'STUB'})")
+          f"(Ctrl+C to stop; analysis mode: {'LIVE' if comment_analysis.ANALYSIS_LIVE else 'OFFLINE'})")
     i = 0
     while max_iterations is None or i < max_iterations:
         check_once()

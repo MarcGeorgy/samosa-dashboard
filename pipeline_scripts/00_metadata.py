@@ -1,5 +1,5 @@
 """
-Shared reference metadata for the MSY listing-survey exercise:
+Shared reference metadata for the S.A.M.O.S.A listing-survey exercise:
 villages (120, across 4 districts, 60 treatment / 60 control) and
 enumerators (female, per the scope of work). Both the XLSForm builder
 and the synthetic data generator import this module so IDs stay consistent.

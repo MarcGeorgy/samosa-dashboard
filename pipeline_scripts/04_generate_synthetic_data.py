@@ -1,5 +1,5 @@
 """
-Synthetic SurveyCTO-style export for the MSY listing survey.
+Synthetic SurveyCTO-style export for the S.A.M.O.S.A listing survey.
 
 Simulates ~120 villages x ~25 attempted households, run by 16 female
 enumerators over Feb-Apr 2027 (per the scope of work timeline), with
@@ -137,8 +137,8 @@ COMMENT_BANK = {
     # "duplicate", "rough estimate"...) but in contexts where a keyword match
     # gets the wrong answer - fatigue language that means the opposite,
     # multi-issue comments a single tag can't capture, genuine ambiguity, and
-    # plain good-quality notes. This is the material the LLM triage step
-    # (07_llm_comment_analysis.py) is meant to handle better.
+    # plain good-quality notes. This is the material the Claude triage step
+    # (07_comment_analysis.py) is meant to handle better.
     "false_positive_fatigue": [
         "Not rushed at all today - had plenty of time and the respondent gave full, thoughtful answers throughout.",
         "Despite being the last household of a long day, this interview did not feel rushed - respondent was talkative and engaged.",
@@ -169,7 +169,7 @@ COMMENT_BANK = {
 
 # categories that CAN be selected as a "no quantitative flag" free comment
 # (weighted so most such comments are still mundane/logistics, matching
-# real field patterns, while giving the LLM stress-test categories real
+# real field patterns, while giving the stress-test categories real
 # representation in the dataset)
 QUALITATIVE_COMMENT_RATE = 0.22
 QUALITATIVE_COMMENT_WEIGHTS = {

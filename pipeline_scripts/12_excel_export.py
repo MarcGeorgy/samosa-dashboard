@@ -8,7 +8,7 @@ Sheets:
   2. Flagged Records      every flagged submission, rows colored by band
   3. Enumerator Summary   per-enumerator QA rollup, colored by avg score
   4. Daily Trend          per-day rollup + a trend line chart
-  5. Comments             enumerator comments with LLM tags/severity
+  5. Comments             enumerator comments with detailed tags/severity
 
 Usage: build_workbook(flagged, enum_summary, daily, comments, summary_json) -> bytes
 """
@@ -28,24 +28,25 @@ from openpyxl.utils import get_column_letter
 SCRIPT_DIR = Path(__file__).parent
 OUT_DIR = Path(tempfile.gettempdir()) / "mvsy_monitoring" / "output"
 
-# ------------------------------------------------------------------ styling
-HEADER_FILL = PatternFill("solid", fgColor="1F3864")
+# --------------------------------------------------------- styling (J-PAL brand)
+# J-PAL Blue #2D616E, Orange #E35925, Green #61B77F, Yellow #F2C200
+HEADER_FILL = PatternFill("solid", fgColor="2D616E")
 HEADER_FONT = Font(color="FFFFFF", bold=True)
-TITLE_FONT = Font(bold=True, size=14, color="1F3864")
+TITLE_FONT = Font(bold=True, size=14, color="2D616E")
 SUBTITLE_FONT = Font(italic=True, size=10, color="666666")
 THIN_BORDER = Border(*[Side(style="thin", color="D9D9D9")] * 4)
 
 BAND_FILLS = {
-    "A - clean": PatternFill("solid", fgColor="C6EFCE"),
-    "B - minor issues": PatternFill("solid", fgColor="FFEB9C"),
-    "C - needs review": PatternFill("solid", fgColor="FFD08A"),
-    "D - flag for supervisor callback": PatternFill("solid", fgColor="FFC7CE"),
+    "A - clean": PatternFill("solid", fgColor="E3F5EA"),
+    "B - minor issues": PatternFill("solid", fgColor="FFF4CC"),
+    "C - needs review": PatternFill("solid", fgColor="FBE0D4"),
+    "D - flag for supervisor callback": PatternFill("solid", fgColor="DCE8EA"),
 }
 BAND_FONTS = {
-    "A - clean": Font(color="006100"),
-    "B - minor issues": Font(color="9C6500"),
-    "C - needs review": Font(color="9C5700"),
-    "D - flag for supervisor callback": Font(color="9C0006"),
+    "A - clean": Font(color="2F7D4F"),
+    "B - minor issues": Font(color="8A6D00"),
+    "C - needs review": Font(color="B84420"),
+    "D - flag for supervisor callback": Font(color="1F4650"),
 }
 
 
@@ -107,7 +108,7 @@ def _metrics_block(ws, start_row: int, pairs: list[tuple]) -> int:
 def _overview_sheet(wb, summary_json: dict):
     ws = wb.active
     ws.title = "Overview"
-    _write_title(ws, "MSY Listing Survey - Data Quality Overview",
+    _write_title(ws, "S.A.M.O.S.A Listing Survey - Data Quality Overview",
                  f"Generated {summary_json.get('generated_at', '')}")
 
     r = _metrics_block(ws, 4, [
@@ -206,9 +207,9 @@ def _comments_sheet(wb, comments: pd.DataFrame):
     ws = wb.create_sheet("Comments")
     _write_title(ws, "Enumerator Field Comments")
     cols = [c for c in ["SubmissionDate", "enumerator_id", "village", "hh_id", "hh_outcome",
-                         "comment_tag", "llm_tags", "llm_severity", "llm_recommended_action",
+                         "comment_tag", "detail_tags", "detail_severity", "recommended_action",
                          "enumerator_comments", "data_quality_score"] if c in comments.columns]
-    _write_table(ws, comments[cols], start_row=4, wrap_cols=["enumerator_comments", "llm_recommended_action"])
+    _write_table(ws, comments[cols], start_row=4, wrap_cols=["enumerator_comments", "recommended_action"])
     if "enumerator_comments" in cols:
         ws.column_dimensions[get_column_letter(cols.index("enumerator_comments") + 1)].width = 60
 
