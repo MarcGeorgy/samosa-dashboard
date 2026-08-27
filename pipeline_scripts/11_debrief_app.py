@@ -79,13 +79,13 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-header_logo, header_text = st.columns([1, 12], vertical_alignment="center")
+header_logo, header_text = st.columns([2, 6], vertical_alignment="center")
 with header_logo:
     if LOGO_PATH.exists():
-        st.image(str(LOGO_PATH), width=48)
+        # official J-PAL logo, pulled directly from povertyactionlab.org
+        st.image(str(LOGO_PATH), width=240)
 with header_text:
-    st.markdown("## :orange[J-PAL]")
-    st.markdown(f"<span style='color:{JPAL_TEAL}; font-size:14px;'>S.A.M.O.S.A Debrief Assistant</span>",
+    st.markdown(f"<span style='color:{JPAL_TEAL}; font-size:16px;'>S.A.M.O.S.A Debrief Assistant</span>",
                 unsafe_allow_html=True)
 st.markdown(f"<hr style='border:none; border-top:3px solid {JPAL_ORANGE}; margin-top:-6px;'>",
             unsafe_allow_html=True)
