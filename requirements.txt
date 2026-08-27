@@ -1,0 +1,6 @@
+pandas
+numpy
+faker
+anthropic
+streamlit==1.62.0
+openpyxl
