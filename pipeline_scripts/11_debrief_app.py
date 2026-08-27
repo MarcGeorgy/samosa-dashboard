@@ -9,8 +9,8 @@ Requires output/msy_listing_raw_export.csv to already exist (run
 10_simulate_new_submission.py to feed it live).
 
 Tabs:
-  - Debrief Agenda       full call agenda generated from the data below
   - Overview            headline QA numbers for the current dataset
+  - Debrief Agenda       full call agenda generated from the data below
   - Correct Outliers     today's flagged records, editable in place -
                           "corrected on the spot" during the call
   - Comment Themes       auto-summarized enumerator free-text comments
@@ -66,29 +66,29 @@ JPAL_GREEN = "#61B77F"
 JPAL_YELLOW = "#F2C200"
 JPAL_BLUE = "#2D616E"
 
+LOGO_PATH = SCRIPT_DIR / "assets" / "jpal_logo.png"
+
 st.set_page_config(page_title="S.A.M.O.S.A Debrief Assistant", page_icon="💧", layout="wide")
 
-st.markdown(f"""
-<link href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;600;700&display=swap" rel="stylesheet">
-<style>
-html, body, [class*="css"] {{ font-family: 'Open Sans', sans-serif; }}
-.jpal-header {{ display: flex; align-items: center; gap: 14px; padding-bottom: 6px;
-                border-bottom: 3px solid {JPAL_ORANGE}; margin-bottom: 18px; }}
-.jpal-header .jpal-word {{ font-family: 'Open Sans', sans-serif; font-weight: 700;
-                           font-size: 30px; color: {JPAL_BLUE}; letter-spacing: 0.5px; }}
-.jpal-header .jpal-sub {{ font-family: 'Open Sans', sans-serif; font-weight: 400;
-                          font-size: 15px; color: {JPAL_TEAL}; margin-top: 2px; }}
-</style>
-<div class="jpal-header">
-  <svg width="34" height="34" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
-    <path d="M50 6 C25 40 12 62 12 78 A38 38 0 1 0 88 78 C88 62 75 40 50 6 Z" fill="{JPAL_ORANGE}"/>
-  </svg>
-  <div>
-    <div class="jpal-word">J-PAL</div>
-    <div class="jpal-sub">S.A.M.O.S.A Debrief Assistant</div>
-  </div>
-</div>
-""", unsafe_allow_html=True)
+# Narrowly scoped: only html/body get the brand font, so Streamlit's own
+# icon fonts (which set their own font-family with higher specificity)
+# aren't affected.
+st.markdown(
+    '<link href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;600;700&display=swap" '
+    'rel="stylesheet"><style>html, body { font-family: \'Open Sans\', sans-serif; }</style>',
+    unsafe_allow_html=True,
+)
+
+header_logo, header_text = st.columns([1, 12], vertical_alignment="center")
+with header_logo:
+    if LOGO_PATH.exists():
+        st.image(str(LOGO_PATH), width=48)
+with header_text:
+    st.markdown("## :orange[J-PAL]")
+    st.markdown(f"<span style='color:{JPAL_TEAL}; font-size:14px;'>S.A.M.O.S.A Debrief Assistant</span>",
+                unsafe_allow_html=True)
+st.markdown(f"<hr style='border:none; border-top:3px solid {JPAL_ORANGE}; margin-top:-6px;'>",
+            unsafe_allow_html=True)
 
 
 # --------------------------------------------------------------- data load
@@ -230,8 +230,8 @@ st.sidebar.download_button(
     width="stretch",
 )
 
-tab_agenda, tab_overview, tab_correct, tab_comments, tab_enum = st.tabs(
-    ["Debrief Agenda", "Overview", "Correct Outliers", "Comment Themes", "Enumerator Callouts"]
+tab_overview, tab_agenda, tab_correct, tab_comments, tab_enum = st.tabs(
+    ["Overview", "Debrief Agenda", "Correct Outliers", "Comment Themes", "Enumerator Callouts"]
 )
 
 # --------------------------------------------------------------- overview
