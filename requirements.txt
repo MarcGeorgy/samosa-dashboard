@@ -4,3 +4,4 @@ faker
 anthropic
 streamlit==1.62.0
 openpyxl
+python-docx

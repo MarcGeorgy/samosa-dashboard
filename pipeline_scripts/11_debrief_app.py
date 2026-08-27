@@ -53,6 +53,7 @@ comment_analysis = _import("comment_analysis", "07_comment_analysis.py")
 insights = _import("debrief_insights", "08_debrief_insights.py")
 scto = _import("surveycto_connector", "06_surveycto_connector.py")
 excel_export = _import("excel_export", "12_excel_export.py")
+agenda_docx = _import("agenda_docx_export", "13_agenda_docx_export.py")
 
 DT_FMT = "%b %d, %Y %I:%M:%S %p"
 
@@ -66,7 +67,7 @@ JPAL_GREEN = "#61B77F"
 JPAL_YELLOW = "#F2C200"
 JPAL_BLUE = "#2D616E"
 
-LOGO_PATH = SCRIPT_DIR / "assets" / "jpal_logo.png"
+LOGO_SVG_PATH = SCRIPT_DIR / "assets" / "jpal_logo_official.svg"
 
 st.set_page_config(page_title="S.A.M.O.S.A Debrief Assistant", page_icon="💧", layout="wide")
 
@@ -81,9 +82,12 @@ st.markdown(
 
 header_logo, header_text = st.columns([2, 6], vertical_alignment="center")
 with header_logo:
-    if LOGO_PATH.exists():
-        # official J-PAL logo, pulled directly from povertyactionlab.org
-        st.image(str(LOGO_PATH), width=240)
+    if LOGO_SVG_PATH.exists():
+        # official J-PAL logo (vector, from povertyactionlab.org) - embedded
+        # inline so the browser renders it natively, pixel-perfect at any
+        # size, instead of a rasterized (and softer) PNG copy
+        svg_markup = LOGO_SVG_PATH.read_text(encoding="utf-8")
+        st.markdown(f'<div style="max-width:260px">{svg_markup}</div>', unsafe_allow_html=True)
 with header_text:
     st.markdown(f"<span style='color:{JPAL_TEAL}; font-size:16px;'>S.A.M.O.S.A Debrief Assistant</span>",
                 unsafe_allow_html=True)
@@ -427,13 +431,25 @@ with tab_enum:
 # --------------------------------------------------------------- agenda
 with tab_agenda:
     st.header("Debrief call agenda")
+    st.caption("Starts with what to ask your enumerators and what to check yourself, then the "
+               "supporting data, then a blank space for your own notes.")
     if st.button("Generate agenda"):
         with st.spinner("Generating agenda..."):
-            agenda_md = insights.generate_debrief_agenda(flagged, enum_summary, summary_json,
-                                                            work_date=selected_date)
+            agenda_payload = insights.build_agenda_payload(flagged, enum_summary, summary_json,
+                                                              work_date=selected_date)
+            agenda_md = insights.phrase_agenda_markdown(agenda_payload)
+            agenda_docx_bytes = agenda_docx.build_agenda_docx(agenda_payload)
         st.session_state["agenda_md"] = agenda_md
+        st.session_state["agenda_docx_bytes"] = agenda_docx_bytes
 
     if "agenda_md" in st.session_state:
         st.markdown(st.session_state["agenda_md"])
-        st.download_button("Download agenda (.md)", st.session_state["agenda_md"],
-                            file_name=f"debrief_agenda_{selected_date}.md")
+        dl_col1, dl_col2 = st.columns(2)
+        with dl_col1:
+            st.download_button("📄 Download agenda (.docx)", st.session_state["agenda_docx_bytes"],
+                                file_name=f"debrief_agenda_{selected_date}.docx",
+                                mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                                width="stretch")
+        with dl_col2:
+            st.download_button("📝 Download agenda (.md)", st.session_state["agenda_md"],
+                                file_name=f"debrief_agenda_{selected_date}.md", width="stretch")
