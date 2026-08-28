@@ -174,12 +174,28 @@ def rerun_pipeline():
 
 
 def bootstrap_demo_data():
-    """Generate a baseline synthetic dataset from scratch. Needed because
-    hosted storage (e.g. Streamlit Community Cloud) is ephemeral - the app's
-    working files can vanish on a cold start/redeploy, so it must be able to
-    rebuild its own demo data rather than just erroring out."""
-    metadata = _import("metadata", "00_metadata.py")
-    synth = _import("generate_synthetic_data", "04_generate_synthetic_data.py")
+    """Generate a full demo dataset from scratch - the same baseline plus
+    the same mix of injected test cases (off-hours, implausibly-fast
+    entries, stale form versions, duplicates, missing GPS, outliers) used
+    to exercise every quality flag, not just a bare ~107-row baseline.
+    Needed because hosted storage (e.g. Streamlit Community Cloud) is
+    ephemeral - the app's working files vanish on every cold start/sleep,
+    so it must be able to rebuild its own full demo data every time rather
+    than just erroring out or showing an under-populated one."""
+    _import("metadata", "00_metadata.py")
+    _import("generate_synthetic_data", "04_generate_synthetic_data.py")
+    simulate_new = _import("simulate_new_submission", "10_simulate_new_submission.py")
+    for n, issue, all_rows in [
+        (15, "off_hours", True),
+        (15, "super_fast", True),
+        (15, "stale_version", True),
+        (6, "duplicate", True),
+        (6, "missing_gps", True),
+        (6, "outlier_income", True),
+        (6, "short_duration", True),
+        (22, "none", False),
+    ]:
+        simulate_new.simulate(n=n, issue=issue, all_rows=all_rows)
 
 
 if LIVE_MODE and not RAW_EXPORT_PATH.exists():
