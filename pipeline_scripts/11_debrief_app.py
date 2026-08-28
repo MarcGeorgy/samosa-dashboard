@@ -91,8 +91,6 @@ with header_logo:
 with header_text:
     st.markdown(f"<span style='color:{JPAL_TEAL}; font-size:16px;'>S.A.M.O.S.A Debrief Assistant</span>",
                 unsafe_allow_html=True)
-st.markdown(f"<hr style='border:none; border-top:3px solid {JPAL_ORANGE}; margin-top:-6px;'>",
-            unsafe_allow_html=True)
 
 
 # --------------------------------------------------------------- data load
@@ -206,8 +204,6 @@ summary_json = load_summary_json()
 daily = load_daily()
 
 # --------------------------------------------------------------- sidebar
-st.sidebar.caption(f"Analysis mode: {'🟢 Live (Claude)' if comment_analysis.ANALYSIS_LIVE else '🟡 Offline (set ANTHROPIC_API_KEY for live analysis)'}")
-st.sidebar.caption(f"Data source: {'🟢 LIVE SurveyCTO (' + scto.SERVER_NAME + ')' if LIVE_MODE else '🟡 Local simulation - set SCTO_SERVER/SCTO_USERNAME/SCTO_PASSWORD for live data'}")
 
 if st.sidebar.button("🔄 Refresh from latest data", width="stretch",
                        help="Pulls new SurveyCTO submissions (if live mode is on) and rescores everything."):
